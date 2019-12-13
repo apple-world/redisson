@@ -1,0 +1,36 @@
+plugins {
+    id 'war'
+}
+
+defaultTasks 'war'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    providedCompile group: 'javax.servlet', name: 'servlet-api', version: '2.3'
+}
+
+war {
+    archiveBaseName = 'hello'
+
+    doLast {
+//        copy {
+//            from "build/libs/${baseName}.war"
+//            into "../local/apache-tomcat-6.0.16/webapps/"
+//            println("deployed tomcat ${baseName}.war")
+//        }
+//        copy {
+//            from "build/libs/${baseName}.war"
+//            into "../local/jboss-5.1.0.GA/server/default/deploy/"
+//            println("deployed jboss ${baseName}.war")
+//        }
+    }
+}
+
+compileJava {
+    sourceCompatibility = 1.7
+    targetCompatibility = 1.7
+    options.encoding = 'windows-31j'
+}

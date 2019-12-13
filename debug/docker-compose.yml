@@ -1,0 +1,15 @@
+version: "3"
+services:
+  redisson_redis:
+    container_name: redis
+    image: "redis:latest"
+    ports:
+      - "6379:6379"
+    volumes:
+      - "./docker/redis/data:/data"
+    environment:
+      TZ: Asia/Tokyo
+    networks:
+      - redisson_back
+networks:
+  redisson_back:

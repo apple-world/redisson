@@ -1,0 +1,6 @@
+hello/.gradle/
+hello/build/
+docker/redis/data/
+
+local/jboss-5.1.0.GA/server/default/data/
+local/jboss-5.1.0.GA/server/default/work/
