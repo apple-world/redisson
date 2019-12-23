@@ -138,8 +138,8 @@ public class RedissonSession extends StandardSession {
         if (map != null) {
             Map<String, Object> newMap = new HashMap<String, Object>(3);
             newMap.put(CREATION_TIME_ATTR, creationTime);
-            newMap.put(LAST_ACCESSED_TIME_ATTR, lastAccessedTime);
-            newMap.put(THIS_ACCESSED_TIME_ATTR, thisAccessedTime);
+            newMap.put(LAST_ACCESSED_TIME_ATTR, getParentFieldToLong("lastAccessedTime"));
+            newMap.put(THIS_ACCESSED_TIME_ATTR, getParentFieldToLong("thisAccessedTime"));
             map.putAll(newMap);
             if (readMode == ReadMode.MEMORY) {
                 topic.publish(createPutAllMessage(newMap));
@@ -153,8 +153,8 @@ public class RedissonSession extends StandardSession {
         
         if (map != null) {
             Map<String, Object> newMap = new HashMap<String, Object>(2);
-            newMap.put(LAST_ACCESSED_TIME_ATTR, lastAccessedTime);
-            newMap.put(THIS_ACCESSED_TIME_ATTR, thisAccessedTime);
+            newMap.put(LAST_ACCESSED_TIME_ATTR, getParentFieldToLong("lastAccessedTime"));
+            newMap.put(THIS_ACCESSED_TIME_ATTR, getParentFieldToLong("thisAccessedTime"));
             map.putAll(newMap);
             if (readMode == ReadMode.MEMORY) {
                 topic.publish(createPutAllMessage(newMap));
@@ -270,8 +270,8 @@ public class RedissonSession extends StandardSession {
         
         Map<String, Object> newMap = new HashMap<String, Object>();
         newMap.put(CREATION_TIME_ATTR, creationTime);
-        newMap.put(LAST_ACCESSED_TIME_ATTR, lastAccessedTime);
-        newMap.put(THIS_ACCESSED_TIME_ATTR, thisAccessedTime);
+        newMap.put(LAST_ACCESSED_TIME_ATTR, getParentFieldToLong("lastAccessedTime"));
+        newMap.put(THIS_ACCESSED_TIME_ATTR, getParentFieldToLong("thisAccessedTime"));
         newMap.put(MAX_INACTIVE_INTERVAL_ATTR, maxInactiveInterval);
         newMap.put(IS_VALID_ATTR, isValid);
         newMap.put(IS_NEW_ATTR, isNew);
@@ -297,7 +297,7 @@ public class RedissonSession extends StandardSession {
         }
         Long lastAccessedTime = (Long) attrs.remove(LAST_ACCESSED_TIME_ATTR);
         if (lastAccessedTime != null) {
-            this.lastAccessedTime = lastAccessedTime;
+            setParentFieldToLong("lastAccessedTime", lastAccessedTime);
         }
         Integer maxInactiveInterval = (Integer) attrs.remove(MAX_INACTIVE_INTERVAL_ATTR);
         if (maxInactiveInterval != null) {
@@ -305,7 +305,7 @@ public class RedissonSession extends StandardSession {
         }
         Long thisAccessedTime = (Long) attrs.remove(THIS_ACCESSED_TIME_ATTR);
         if (thisAccessedTime != null) {
-            this.thisAccessedTime = thisAccessedTime;
+            setParentFieldToLong("thisAccessedTime", thisAccessedTime);
         }
         Boolean isValid = (Boolean) attrs.remove(IS_VALID_ATTR);
         if (isValid != null) {
@@ -326,5 +326,40 @@ public class RedissonSession extends StandardSession {
         super.recycle();
         map = null;
     }
-    
+
+    /**
+     * jbossのStandardSessionは、lastAccessedTime,thisAccessedTimeがint型だった
+     * (tomcatはlong型)
+     * 
+     * tomcat,jboss両方動くようにする為、このメソッドでlong型にして対応する
+     */
+    private void setParentFieldToLong(String fieldName, Long longValue) {
+        try {
+            Field parentLongField = this.getClass().getSuperclass().getDeclaredField(fieldName);
+            parentLongField.setLong(parentLongField, longValue);
+        } catch (NoSuchFieldException e) {
+            e.printStackTrace();
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * jbossのStandardSessionは、lastAccessedTime,thisAccessedTimeがint型だった
+     * (tomcatはlong型)
+     * 
+     * redissonはlong型を前提にしているので、このメソッドでlong型にして対応する
+     */
+    private long getParentFieldToLong(String fieldName) {
+        long parentLongFieldValue = 0;
+        try {
+            Field parentLongField = this.getClass().getSuperclass().getDeclaredField(fieldName);
+            parentLongFieldValue = parentLongField.getLong(this);
+        } catch (NoSuchFieldException e) {
+            e.printStackTrace();
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        }
+        return parentLongFieldValue;
+    }
 }
