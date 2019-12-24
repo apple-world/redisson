@@ -341,7 +341,7 @@ public class RedissonSession extends StandardSession {
         try {
             Class<?> superCls = this.getClass().getSuperclass();
             Field parentField = superCls.getDeclaredField(fieldName);
-            log.info("set:" + fieldName + ":" + parentField);
+            log.info("set:" + fieldName + ":" + parentField + ":" + longValue);
             parentField.setAccessible(true);
             // jboss用
             parentField.setInt(this, new Integer(longValue.toString()).intValue());
