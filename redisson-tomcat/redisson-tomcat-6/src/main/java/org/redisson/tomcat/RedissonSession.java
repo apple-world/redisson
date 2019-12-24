@@ -33,6 +33,9 @@ import org.redisson.api.RTopic;
 import org.redisson.tomcat.RedissonSessionManager.ReadMode;
 import org.redisson.tomcat.RedissonSessionManager.UpdateMode;
 
+import org.apache.juli.logging.Log;
+import org.apache.juli.logging.LogFactory;
+
 /**
  * Redisson Session object for Apache Tomcat
  * 
@@ -57,7 +60,8 @@ public class RedissonSession extends StandardSession {
     private final RTopic topic;
     private final RedissonSessionManager.ReadMode readMode;
     private final UpdateMode updateMode;
-    
+    private final Log log = LogFactory.getLog(RedissonSession.class);
+
     public RedissonSession(RedissonSessionManager manager, ReadMode readMode, UpdateMode updateMode) {
         super(manager);
         this.redissonManager = manager;
@@ -138,8 +142,8 @@ public class RedissonSession extends StandardSession {
         if (map != null) {
             Map<String, Object> newMap = new HashMap<String, Object>(3);
             newMap.put(CREATION_TIME_ATTR, creationTime);
-            newMap.put(LAST_ACCESSED_TIME_ATTR, getParentFieldToLong("lastAccessedTime"));
-            newMap.put(THIS_ACCESSED_TIME_ATTR, getParentFieldToLong("thisAccessedTime"));
+            newMap.put(LAST_ACCESSED_TIME_ATTR, getParentField("lastAccessedTime"));
+            newMap.put(THIS_ACCESSED_TIME_ATTR, getParentField("thisAccessedTime"));
             map.putAll(newMap);
             if (readMode == ReadMode.MEMORY) {
                 topic.publish(createPutAllMessage(newMap));
@@ -153,8 +157,8 @@ public class RedissonSession extends StandardSession {
         
         if (map != null) {
             Map<String, Object> newMap = new HashMap<String, Object>(2);
-            newMap.put(LAST_ACCESSED_TIME_ATTR, getParentFieldToLong("lastAccessedTime"));
-            newMap.put(THIS_ACCESSED_TIME_ATTR, getParentFieldToLong("thisAccessedTime"));
+            newMap.put(LAST_ACCESSED_TIME_ATTR, getParentField("lastAccessedTime"));
+            newMap.put(THIS_ACCESSED_TIME_ATTR, getParentField("thisAccessedTime"));
             map.putAll(newMap);
             if (readMode == ReadMode.MEMORY) {
                 topic.publish(createPutAllMessage(newMap));
@@ -270,8 +274,8 @@ public class RedissonSession extends StandardSession {
         
         Map<String, Object> newMap = new HashMap<String, Object>();
         newMap.put(CREATION_TIME_ATTR, creationTime);
-        newMap.put(LAST_ACCESSED_TIME_ATTR, getParentFieldToLong("lastAccessedTime"));
-        newMap.put(THIS_ACCESSED_TIME_ATTR, getParentFieldToLong("thisAccessedTime"));
+        newMap.put(LAST_ACCESSED_TIME_ATTR, getParentField("lastAccessedTime"));
+        newMap.put(THIS_ACCESSED_TIME_ATTR, getParentField("thisAccessedTime"));
         newMap.put(MAX_INACTIVE_INTERVAL_ATTR, maxInactiveInterval);
         newMap.put(IS_VALID_ATTR, isValid);
         newMap.put(IS_NEW_ATTR, isNew);
@@ -297,7 +301,7 @@ public class RedissonSession extends StandardSession {
         }
         Long lastAccessedTime = (Long) attrs.remove(LAST_ACCESSED_TIME_ATTR);
         if (lastAccessedTime != null) {
-            setParentFieldToLong("lastAccessedTime", lastAccessedTime);
+            setParentField("lastAccessedTime", lastAccessedTime);
         }
         Integer maxInactiveInterval = (Integer) attrs.remove(MAX_INACTIVE_INTERVAL_ATTR);
         if (maxInactiveInterval != null) {
@@ -305,7 +309,7 @@ public class RedissonSession extends StandardSession {
         }
         Long thisAccessedTime = (Long) attrs.remove(THIS_ACCESSED_TIME_ATTR);
         if (thisAccessedTime != null) {
-            setParentFieldToLong("thisAccessedTime", thisAccessedTime);
+            setParentField("thisAccessedTime", thisAccessedTime);
         }
         Boolean isValid = (Boolean) attrs.remove(IS_VALID_ATTR);
         if (isValid != null) {
@@ -331,12 +335,18 @@ public class RedissonSession extends StandardSession {
      * jbossのStandardSessionは、lastAccessedTime,thisAccessedTimeがint型だった
      * (tomcatはlong型)
      * 
-     * tomcat,jboss両方動くようにする為、このメソッドでlong型にして対応する
+     * jbossで動くようint型でセットする
      */
-    private void setParentFieldToLong(String fieldName, Long longValue) {
+    private void setParentField(String fieldName, Long longValue) {
         try {
-            Field parentLongField = this.getClass().getSuperclass().getDeclaredField(fieldName);
-            parentLongField.setLong(parentLongField, longValue);
+            Class<?> superCls = this.getClass().getSuperclass();
+            Field parentField = superCls.getDeclaredField(fieldName);
+            log.info("set:" + fieldName + ":" + parentField);
+            parentField.setAccessible(true);
+            // jboss用
+            parentField.setInt(this, new Integer(longValue.toString()).intValue());
+            // tomcat用
+            // parentLongField.setLong(this, longValue);
         } catch (NoSuchFieldException e) {
             e.printStackTrace();
         } catch (IllegalAccessException e) {
@@ -350,16 +360,20 @@ public class RedissonSession extends StandardSession {
      * 
      * redissonはlong型を前提にしているので、このメソッドでlong型にして対応する
      */
-    private long getParentFieldToLong(String fieldName) {
-        long parentLongFieldValue = 0;
+    private long getParentField(String fieldName) {
+        long parentFieldValue = 0;
         try {
-            Field parentLongField = this.getClass().getSuperclass().getDeclaredField(fieldName);
-            parentLongFieldValue = parentLongField.getLong(this);
+            Field parentField = this.getClass().getSuperclass().getDeclaredField(fieldName);
+            // jboss用
+            parentFieldValue = parentField.getInt(this);
+            // tomcat用
+            // parentLongFieldValue = parentLongField.getLong(this);
+            log.info("get:" + fieldName + ":" + parentFieldValue);
         } catch (NoSuchFieldException e) {
             e.printStackTrace();
         } catch (IllegalAccessException e) {
             e.printStackTrace();
         }
-        return parentLongFieldValue;
+        return (long) parentFieldValue;
     }
 }
