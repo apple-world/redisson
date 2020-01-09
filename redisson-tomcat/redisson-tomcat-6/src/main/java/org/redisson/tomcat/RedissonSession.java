@@ -51,7 +51,7 @@ public class RedissonSession extends StandardSession {
     private static final String MAX_INACTIVE_INTERVAL_ATTR = "session:maxInactiveInterval";
     private static final String LAST_ACCESSED_TIME_ATTR = "session:lastAccessedTime";
     private static final String CREATION_TIME_ATTR = "session:creationTime";
-    // struts用localeキー
+    // strutsが使用するlocaleのキー
     private static final String STRUTS_GLOBALS_LOCALE_KEY = "org.apache.struts.action.LOCALE";
 
     public static final Set<String> ATTRS = new HashSet<String>(Arrays.asList(IS_NEW_ATTR, IS_VALID_ATTR, 
@@ -94,10 +94,9 @@ public class RedissonSession extends StandardSession {
             }
 
             /**
-             * strutsはLocaleをセッションに保存しているのだが、
+             * strutsはLocaleをセッションに保存するのだが、
              * Localeはデシリアライズできないバグがある。。
-             * struts側の修正をすると改修範囲が広いので、下記で復元して返すようにしている。
-             * (暫定対応)
+             * struts側の修正をすると改修範囲が広いので、redisson側でLocaleを復元して返すよう修正
              */
             if (name.equals(STRUTS_GLOBALS_LOCALE_KEY)) {
                 Object o = map.get(name);
@@ -354,12 +353,8 @@ public class RedissonSession extends StandardSession {
         try {
             Class<?> superCls = this.getClass().getSuperclass();
             Field parentField = superCls.getDeclaredField(fieldName);
-            // log.info("set:" + fieldName + ":" + parentField + ":" + longValue);
             parentField.setAccessible(true);
-            // jboss用
             parentField.setInt(this, new Integer(longValue.toString()).intValue());
-            // tomcat用
-            // parentLongField.setLong(this, longValue);
         } catch (NoSuchFieldException e) {
             e.printStackTrace();
         } catch (IllegalAccessException e) {
@@ -377,11 +372,7 @@ public class RedissonSession extends StandardSession {
         long parentFieldValue = 0;
         try {
             Field parentField = this.getClass().getSuperclass().getDeclaredField(fieldName);
-            // jboss用
             parentFieldValue = parentField.getInt(this);
-            // tomcat用
-            // parentLongFieldValue = parentLongField.getLong(this);
-            // log.info("get:" + fieldName + ":" + parentFieldValue);
         } catch (NoSuchFieldException e) {
             e.printStackTrace();
         } catch (IllegalAccessException e) {
