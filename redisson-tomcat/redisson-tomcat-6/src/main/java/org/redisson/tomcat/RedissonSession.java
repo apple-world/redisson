@@ -34,9 +34,6 @@ import org.redisson.api.RTopic;
 import org.redisson.tomcat.RedissonSessionManager.ReadMode;
 import org.redisson.tomcat.RedissonSessionManager.UpdateMode;
 
-import org.apache.juli.logging.Log;
-import org.apache.juli.logging.LogFactory;
-
 /**
  * Redisson Session object for Apache Tomcat
  * 
@@ -56,14 +53,13 @@ public class RedissonSession extends StandardSession {
 
     public static final Set<String> ATTRS = new HashSet<String>(Arrays.asList(IS_NEW_ATTR, IS_VALID_ATTR, 
             THIS_ACCESSED_TIME_ATTR, MAX_INACTIVE_INTERVAL_ATTR, LAST_ACCESSED_TIME_ATTR, CREATION_TIME_ATTR));
-    
+
     private final RedissonSessionManager redissonManager;
     private final Map<String, Object> attrs;
     private RMap<String, Object> map;
     private final RTopic topic;
     private final RedissonSessionManager.ReadMode readMode;
     private final UpdateMode updateMode;
-    private final Log log = LogFactory.getLog(RedissonSession.class);
 
     public RedissonSession(RedissonSessionManager manager, ReadMode readMode, UpdateMode updateMode) {
         super(manager);
