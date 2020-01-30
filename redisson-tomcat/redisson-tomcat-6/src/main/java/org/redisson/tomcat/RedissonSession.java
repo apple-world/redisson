@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.Locale;
 
 import org.apache.catalina.session.StandardSession;
 import org.redisson.api.RMap;
@@ -47,17 +48,19 @@ public class RedissonSession extends StandardSession {
     private static final String MAX_INACTIVE_INTERVAL_ATTR = "session:maxInactiveInterval";
     private static final String LAST_ACCESSED_TIME_ATTR = "session:lastAccessedTime";
     private static final String CREATION_TIME_ATTR = "session:creationTime";
-    
+    // strutsが使用するlocaleのキー
+    private static final String STRUTS_GLOBALS_LOCALE_KEY = "org.apache.struts.action.LOCALE";
+
     public static final Set<String> ATTRS = new HashSet<String>(Arrays.asList(IS_NEW_ATTR, IS_VALID_ATTR, 
             THIS_ACCESSED_TIME_ATTR, MAX_INACTIVE_INTERVAL_ATTR, LAST_ACCESSED_TIME_ATTR, CREATION_TIME_ATTR));
-    
+
     private final RedissonSessionManager redissonManager;
     private final Map<String, Object> attrs;
     private RMap<String, Object> map;
     private final RTopic topic;
     private final RedissonSessionManager.ReadMode readMode;
     private final UpdateMode updateMode;
-    
+
     public RedissonSession(RedissonSessionManager manager, ReadMode readMode, UpdateMode updateMode) {
         super(manager);
         this.redissonManager = manager;
@@ -86,9 +89,18 @@ public class RedissonSession extends StandardSession {
                 return null;
             }
 
+            /**
+             * strutsはLocaleをセッションに保存するのだが、
+             * Localeはデシリアライズできないバグがある。。
+             * struts側の修正をすると改修範囲が広いので、redisson側でLocaleを復元して返すよう修正
+             */
+            if (name.equals(STRUTS_GLOBALS_LOCALE_KEY)) {
+                Object o = map.get(name);
+                if (o == null) return null;
+                return new Locale(o.toString());
+            }
             return map.get(name);
         }
-
         return super.getAttribute(name);
     }
     
@@ -138,8 +150,8 @@ public class RedissonSession extends StandardSession {
         if (map != null) {
             Map<String, Object> newMap = new HashMap<String, Object>(3);
             newMap.put(CREATION_TIME_ATTR, creationTime);
-            newMap.put(LAST_ACCESSED_TIME_ATTR, lastAccessedTime);
-            newMap.put(THIS_ACCESSED_TIME_ATTR, thisAccessedTime);
+            newMap.put(LAST_ACCESSED_TIME_ATTR, getParentField("lastAccessedTime"));
+            newMap.put(THIS_ACCESSED_TIME_ATTR, getParentField("thisAccessedTime"));
             map.putAll(newMap);
             if (readMode == ReadMode.MEMORY) {
                 topic.publish(createPutAllMessage(newMap));
@@ -153,8 +165,8 @@ public class RedissonSession extends StandardSession {
         
         if (map != null) {
             Map<String, Object> newMap = new HashMap<String, Object>(2);
-            newMap.put(LAST_ACCESSED_TIME_ATTR, lastAccessedTime);
-            newMap.put(THIS_ACCESSED_TIME_ATTR, thisAccessedTime);
+            newMap.put(LAST_ACCESSED_TIME_ATTR, getParentField("lastAccessedTime"));
+            newMap.put(THIS_ACCESSED_TIME_ATTR, getParentField("thisAccessedTime"));
             map.putAll(newMap);
             if (readMode == ReadMode.MEMORY) {
                 topic.publish(createPutAllMessage(newMap));
@@ -270,8 +282,8 @@ public class RedissonSession extends StandardSession {
         
         Map<String, Object> newMap = new HashMap<String, Object>();
         newMap.put(CREATION_TIME_ATTR, creationTime);
-        newMap.put(LAST_ACCESSED_TIME_ATTR, lastAccessedTime);
-        newMap.put(THIS_ACCESSED_TIME_ATTR, thisAccessedTime);
+        newMap.put(LAST_ACCESSED_TIME_ATTR, getParentField("lastAccessedTime"));
+        newMap.put(THIS_ACCESSED_TIME_ATTR, getParentField("thisAccessedTime"));
         newMap.put(MAX_INACTIVE_INTERVAL_ATTR, maxInactiveInterval);
         newMap.put(IS_VALID_ATTR, isValid);
         newMap.put(IS_NEW_ATTR, isNew);
@@ -297,7 +309,7 @@ public class RedissonSession extends StandardSession {
         }
         Long lastAccessedTime = (Long) attrs.remove(LAST_ACCESSED_TIME_ATTR);
         if (lastAccessedTime != null) {
-            this.lastAccessedTime = lastAccessedTime;
+            setParentField("lastAccessedTime", lastAccessedTime);
         }
         Integer maxInactiveInterval = (Integer) attrs.remove(MAX_INACTIVE_INTERVAL_ATTR);
         if (maxInactiveInterval != null) {
@@ -305,7 +317,7 @@ public class RedissonSession extends StandardSession {
         }
         Long thisAccessedTime = (Long) attrs.remove(THIS_ACCESSED_TIME_ATTR);
         if (thisAccessedTime != null) {
-            this.thisAccessedTime = thisAccessedTime;
+            setParentField("thisAccessedTime", thisAccessedTime);
         }
         Boolean isValid = (Boolean) attrs.remove(IS_VALID_ATTR);
         if (isValid != null) {
@@ -326,5 +338,42 @@ public class RedissonSession extends StandardSession {
         super.recycle();
         map = null;
     }
-    
+
+    /**
+     * jbossのStandardSessionは、lastAccessedTime,thisAccessedTimeがint型だった
+     * (tomcatはlong型)
+     * 
+     * jbossで動くようint型でセットする
+     */
+    private void setParentField(String fieldName, Long longValue) {
+        try {
+            Class<?> superCls = this.getClass().getSuperclass();
+            Field parentField = superCls.getDeclaredField(fieldName);
+            parentField.setAccessible(true);
+            parentField.setInt(this, new Integer(longValue.toString()).intValue());
+        } catch (NoSuchFieldException e) {
+            e.printStackTrace();
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * jbossのStandardSessionは、lastAccessedTime,thisAccessedTimeがint型だった
+     * (tomcatはlong型)
+     * 
+     * redissonはlong型を前提にしているので、このメソッドでlong型にして対応する
+     */
+    private long getParentField(String fieldName) {
+        long parentFieldValue = 0;
+        try {
+            Field parentField = this.getClass().getSuperclass().getDeclaredField(fieldName);
+            parentFieldValue = parentField.getInt(this);
+        } catch (NoSuchFieldException e) {
+            e.printStackTrace();
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        }
+        return (long) parentFieldValue;
+    }
 }
