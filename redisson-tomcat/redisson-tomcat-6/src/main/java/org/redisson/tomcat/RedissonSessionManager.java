@@ -173,21 +173,26 @@ public class RedissonSessionManager extends ManagerBase implements Lifecycle {
                     if (readMode == ReadMode.MEMORY) {
                         attrs = getMap(id).readAllMap();
                     } else {
+                        // redisから取得
                         attrs = getMap(id).getAll(RedissonSession.ATTRS);
                     }
                 } catch (Exception e) {
                     log.error("Can't read session object by id " + id, e);
                 }
-                
+                // isValidがfalseの場合、redisにあってもセッションはなし扱いになる
                 if (attrs.isEmpty() || !Boolean.valueOf(String.valueOf(attrs.get("session:isValid")))) {
                     log.info("Session " + id + " can't be found");
                     return null;
                 }
-                
+
                 RedissonSession session = (RedissonSession) createEmptySession();
+                // redisの内容を優先的に反映させるよう修正
+                session.load(attrs);
+
+                // setIdは単純にidをセットしているように見えるが、実は裏で保存処理をしている
+                // その為、修正前はloadの前に保存処理が走り、redisの内容が先祖返りしていた・・
                 session.setId(id);
                 session.setManager(this);
-                session.load(attrs);
                 
                 session.access();
                 session.endAccess();
