@@ -88,3 +88,43 @@ Each RedissonSessionManager created per Web Application and thus creates own Red
       [redisson-tomcat-8-2.15.1.jar](https://repository.sonatype.org/service/local/artifact/maven/redirect?r=central-proxy&g=org.redisson&a=redisson-tomcat-8&v=2.15.1&e=jar)  
 
 
+redisson-tomcat 開発手順
+===============================
+
+### build
+    # pwebのjbossが5系の為、tomcat6系を使用する
+    cd redisson-tomcat/redisson-tomcat-6
+    gradle
+
+### debug
+#### tomcat6
+    cd debug
+
+    # redisを起動
+    docker-compose up -d
+
+    # tomcatにjarを設置し、起動
+    cp ../redisson-tomcat/redisson-tomcat-6/build/libs/redisson-tomcat-6-2.15.2.jar local/apache-tomcat-6.0.16/lib/
+    ./local/apache-tomcat-6.0.16/bin/startup.sh
+
+    # ブラウザで確認
+    http://localhost:8080/hello/
+
+    # tomcat停止
+    ./local/apache-tomcat-6.0.16/bin/shutdown.sh
+
+#### jboss5
+    cd debug
+
+    # redisを起動
+    docker-compose up -d
+
+    # jbosssにjarを設置し、起動
+    cp ../redisson-tomcat/redisson-tomcat-6/build/libs/redisson-tomcat-6-2.15.2.jar local/jboss-5.1.0.GA/common/lib/
+    ./local/jboss-5.1.0.GA/bin/run.sh -c default -b 0.0.0.0
+
+    # ブラウザで確認
+    http://localhost:8080/hello/
+ 
+    # jboss停止
+    ./local/jboss-5.1.0.GA/bin/shutdown.sh
